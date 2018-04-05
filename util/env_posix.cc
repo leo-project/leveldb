@@ -264,8 +264,14 @@ class PosixMmapFile : public WritableFile {
         file_offset_-=offset_adjust;
 
     assert(base_ == NULL);
-    if (ftruncate(fd_, file_offset_ + map_size_) < 0) {
-      return false;
+    // Use fallocate instead of ftruncate to avoid fragmentations
+    int alloc_status = fallocate(fd_, 0, file_offset_, map_size_);
+    if (alloc_status != 0) {
+        // fallback to posix_fallocate
+        alloc_status = posix_fallocate(fd_, file_offset_, map_size_);
+    }
+    if (alloc_status != 0) {
+        return false;
     }
     void* ptr = mmap(NULL, map_size_, PROT_WRITE, MAP_SHARED,
                      fd_, file_offset_);
