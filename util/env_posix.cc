@@ -264,6 +264,7 @@ class PosixMmapFile : public WritableFile {
         file_offset_-=offset_adjust;
 
     assert(base_ == NULL);
+#ifdef OS_LINUX
     // Use fallocate instead of ftruncate to avoid fragmentations
     int alloc_status = fallocate(fd_, 0, file_offset_, map_size_);
     if (alloc_status != 0) {
@@ -273,6 +274,12 @@ class PosixMmapFile : public WritableFile {
     if (alloc_status != 0) {
         return false;
     }
+#else
+    // Keep the same behaviour on other supported platforms (FreeBSD, SmartOS)
+    if (ftruncate(fd_, file_offset_ + map_size_) < 0) {
+        return false;
+    }
+#endif
     void* ptr = mmap(NULL, map_size_, PROT_WRITE, MAP_SHARED,
                      fd_, file_offset_);
     if (ptr == MAP_FAILED) {
